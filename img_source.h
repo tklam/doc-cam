@@ -5,11 +5,11 @@
 #include <string>
 
 struct ImageSource {
-  virtual cv::Mat get_image() = 0;
+    virtual cv::Mat get_image() = 0;
 };
 
 struct FileImageSource: public ImageSource {
-  std::string filename; 
-  cv::Mat get_image() override;
+    std::string filename; 
+    cv::Mat get_image() override;
 };
 #endif
