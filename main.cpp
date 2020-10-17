@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <climits>
+#include <cmath>
 
 #include "img_source.h"
 
@@ -49,6 +50,7 @@ struct SortCounterClockwise {
 };
 
 void make_proper_contour(std::vector<cv::Point> & points) {
+    // sort counter clockwise
     SortCounterClockwise<cv::Point> sort_clockwise;
     // find the centre
     for (auto const i : points) {
@@ -62,21 +64,22 @@ void make_proper_contour(std::vector<cv::Point> & points) {
 //    // counter clockwise
 //    std::reverse(points.begin(), points.end());
 
-    // find the point with the lowest Y coordinate
-    int lowest_y = INT_MAX;
-    size_t lowest_index = 0;
+    // sort such that the frst point is the nearest to (0,0)
+    int min_dist = INT_MAX;
+    size_t min_index = 0;
     for (size_t i=0; i<points.size(); ++i) {
-        if (points[i].y < lowest_y) {
-            lowest_y = points[i].y;
-            lowest_index = i;
+        int dist = (int)sqrt(points[i].x*points[i].x + points[i].y*points[i].y);
+        if (dist < min_dist) {
+            min_dist = dist;
+            min_index = i;
         }
     }
 
     // make the point with the lowest Y coordinate the first element
-    for (size_t i=0; i<lowest_index; ++i) {
+    for (size_t i=0; i<min_index; ++i) {
         points.emplace_back(points[i]);
     }
-    points.erase(points.begin(), points.begin()+lowest_index);
+    points.erase(points.begin(), points.begin()+min_index);
 }
 
 std::vector<cv::Point> const & calc_largest_contour(std::vector<std::vector<cv::Point>> &contours) {
@@ -133,7 +136,6 @@ bool identify_doc_by_contour(cv::Mat const & img, std::vector<cv::Point> & best_
 
     if (!empty_countours) {
         auto const & max_contour = calc_largest_contour(contours);
-        best_contour = max_contour;
 
         debug_code({
             Scalar color = Scalar(128, 128, 128, 128);
@@ -149,6 +151,20 @@ bool identify_doc_by_contour(cv::Mat const & img, std::vector<cv::Point> & best_
             drawContours( drawing, draw, 0, color );
             display_img(drawing);
         });
+
+        // some filters to get rid of the potentially inappropriate contour
+        
+        // assume the area of the max contour > 25% of the pic area
+        float const contour_area = contourArea(max_contour);
+        float const img_area = img.rows * img.cols;
+        if (contour_area < img_area * 0.25f) {
+            debug_code(
+                printf("contour area: %f image area: %f\n", contour_area, img_area)
+            );
+            return false;
+        }
+
+        best_contour = max_contour;
 
         return true;
     }
@@ -169,6 +185,9 @@ bool warp_contour_perspective(cv::Mat const & original_img, std::vector<cv::Poin
 
     // approximate the best contour with only 4 points
     float const ratio = rect.size.height / rect.size.width;
+    debug_code(
+        printf("detected rect of convex hull's ratio: %f\n", ratio)
+    );
 
     vector<Point> approx_contour_int_pts;
     int epsilon = 0;
@@ -184,11 +203,13 @@ bool warp_contour_perspective(cv::Mat const & original_img, std::vector<cv::Poin
     }
 
     // make approx_contour_.pts into a proper contour:
-    // sort the points in an counter-clockwise order, with the top left point has the lowest Y coordinate
     make_proper_contour(approx_contour_int_pts);
     vector<Point2f> approx_contour_pts;
     for (auto const i : approx_contour_int_pts) {
         approx_contour_pts.emplace_back(std::move(Point2f(i.x, i.y)));
+        debug_code(
+            printf("approx contour: (%d, %d)\n", i.x, i.y)
+        );
     }
 
     // define the destination coordinates
