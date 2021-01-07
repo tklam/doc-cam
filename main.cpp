@@ -126,7 +126,7 @@ bool identify_doc_by_contour(cv::Mat const & img, std::vector<cv::Point> & best_
     using namespace cv;
     using namespace std;
 
-    //find the contours
+    // find the contours
     vector<vector<Point>> contours;
     vector<Vec4i> hierarchy;
     findContours(img, contours, noArray(), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -168,6 +168,52 @@ bool identify_doc_by_contour(cv::Mat const & img, std::vector<cv::Point> & best_
 
         return true;
     }
+
+    return false;
+}
+
+bool identify_doc_by_corners(cv::Mat const & img, std::vector<cv::Point> & best_contour) {
+    using namespace cv;
+    using namespace std;
+
+    // find the good features (corners)
+    vector<Point2f> corners;
+    double maxCorners = 0;
+    double qualityLevel = 0.01;
+    double minDistance = 10;
+    int blockSize = 3, gradientSize = 3;
+    bool useHarrisDetector = true;
+    double k = 0.04;
+    goodFeaturesToTrack(img,
+                        corners,
+                        maxCorners,
+                        qualityLevel,
+                        minDistance,
+                        cv::Mat(),
+                        blockSize,
+                        gradientSize,
+                        useHarrisDetector,
+                        k );
+
+    debug_code({
+        Scalar color = Scalar(0, 255, 255, 255);
+        Mat drawing = img.clone();
+        for (auto const & c: corners) {
+            cv::circle(drawing, c, 1, color, cv::LINE_8);
+        }
+        printf("Number of corners: %d\n", corners.size());
+        display_img(drawing);
+    });
+
+    // produce a new image using the extracted features drawn as large dots
+    Mat corners_img = img.clone();
+    Scalar color = Scalar(255, 255, 255, 255);
+    for (auto const & c: corners) {
+        cv::circle(corners_img, c, 1, color, cv::LINE_AA);
+    }
+
+    // find the best contour on the "image of feature dots"
+    identify_doc_by_contour(corners_img, best_contour);
 
     return false;
 }
@@ -245,11 +291,13 @@ int main(int argc, char** argv) {
     //---------------------- identify the docutment
     vector<Point> best_contour;
     bool const can_find_contour = identify_doc_by_contour(preprocessed_frame, best_contour);
-
-    bool const is_success_contour = can_find_contour;
-    if (is_success_contour) {
+    if (can_find_contour) {
         warp_contour_perspective(img, best_contour, 1000);
+        return 0;
     }
+
+    vector<Point> corner_best_contour;
+    bool const can_find_corner = identify_doc_by_corners(preprocessed_frame, corner_best_contour);
 
     return 0;
 }
