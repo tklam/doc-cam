@@ -12,3 +12,10 @@ build-docker-img-linux: Docker/Dockerfile.dev
 build-docker-img-mac: Docker/Dockerfile.dev
 	docker build \
 		-f Docker/Dockerfile.dev -t doc-cam-builder:1.0 .
+
+.PHONY: enter-container
+enter-container:
+	docker run \
+		--rm -it \
+		-v $(shell bash -c 'pwd'):/workspace \
+		doc-cam-builder:1.0 /bin/bash
