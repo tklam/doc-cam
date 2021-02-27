@@ -1,0 +1,46 @@
+# With reference to https://github.com/schickling/dockerfiles/blob/master/opencv/Dockerfile
+FROM debian:buster 
+
+ARG CMAKE_VERSION="3.19.6"
+ARG OPENCV_VERSION="4.0.0"
+
+ARG UNAME="project_builder"
+ARG UID="1000"
+ARG GID="1000"
+
+RUN groupadd -g ${GID} ${UNAME}} \
+    && useradd -u ${UID} -g ${GID} ${UNAME}
+
+RUN apt update -y \
+    && apt install -y build-essential wget curl git libssl-dev
+
+RUN mkdir -p /opt \
+    \
+    ## Install CMake 3.19.6 
+    ##    https://cmake.org/download/
+    ##    https://linuxhint.com/install-cmake-on-debian-10/
+    && cd /opt \
+    && wget -O cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz \ 
+    && tar xvzf cmake.tar.gz \
+    && cd cmake-${CMAKE_VERSION} \
+    && ./bootstrap && make -j $(nproc) \
+    && make install \
+    && cmake --version
+
+    ## Install opencv
+    ##    https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html
+RUN apt install libgtk2.0-dev pkg-config -y \
+    && cd /opt \
+    && curl -sL https://github.com/Itseez/opencv/archive/$OPENCV_VERSION.tar.gz | tar xvz -C /opt \
+    && cd opencv-${OPENCV_VERSION} \
+    && mkdir -p build && cd build \
+    && cmake cmake -DWITH_FFMPEG=OFF -DWITH_OPENEXR=OFF -DBUILD_TIFF=OFF -DWITH_CUDA=OFF -DWITH_NVCUVID=OFF -DBUILD_PNG=OFF .. \
+    && make -j $(nproc) \
+    && make install \
+    && cd .. && rm -rf build
+
+USER ${UNAME}
+
+WORKDIR /workspace
+
+CMD [ "/bin/bash" ]
