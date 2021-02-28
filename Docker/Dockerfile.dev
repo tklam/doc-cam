@@ -8,7 +8,7 @@ ARG UNAME="project_builder"
 ARG UID="1000"
 ARG GID="1000"
 
-RUN groupadd -g ${GID} ${UNAME}} \
+RUN groupadd -g ${GID} ${UNAME} \
     && useradd -u ${UID} -g ${GID} ${UNAME}
 
 RUN apt update -y \
